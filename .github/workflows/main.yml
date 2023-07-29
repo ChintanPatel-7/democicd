@@ -3,26 +3,38 @@ name: Build and Deploy
 on:
   push:
     branches:
-      - development
+      - main
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Build and publish ASP.NET Core app
+      - name: Build ASP.NET Core app
         run: dotnet publish -c Release -o publish
 
-      - name: Deploy to Plesk
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.PLESK_HOST }}
-          username: ${{ secrets.PLESK_USERNAME }}
-          key: ${{ secrets.PLESK_SSH_PRIVATE_KEY }}
-          script: |
-            cd /var/www/vhosts/example.com/httpdocs
-            rm -rf *
-            cp -R /path/to/repo/publish/* .
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install lftp -y
+
+      - name: Deploy to Plesk via FTP
+        env:
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_HOST: your-ftp-host.com
+        run: |
+          lftp -c "
+          set ftp:ssl-allow no  # Use this line if FTPS is not required
+          open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_HOST
+          mirror -R ./publish /httpdocs  # Change '/httpdocs' to the appropriate path on the Plesk server
+          "
