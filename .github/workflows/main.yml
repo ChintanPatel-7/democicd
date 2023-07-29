@@ -1,0 +1,28 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Build and publish ASP.NET Core app
+        run: dotnet publish -c Release -o publish
+
+      - name: Deploy to Plesk
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PLESK_HOST }}
+          username: ${{ secrets.PLESK_USERNAME }}
+          key: ${{ secrets.PLESK_SSH_PRIVATE_KEY }}
+          script: |
+            cd /var/www/vhosts/example.com/httpdocs
+            rm -rf *
+            cp -R /path/to/repo/publish/* .
